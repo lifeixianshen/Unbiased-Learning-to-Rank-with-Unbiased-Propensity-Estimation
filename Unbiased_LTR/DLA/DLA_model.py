@@ -68,7 +68,7 @@ class DLA(object):
 
 	def __init__(self, click_model, rank_list_size,
 		embed_size, batch_size, hparam_str, forward_only=False, feed_previous = False):
-		"""Create the model.
+	    """Create the model.
 	
 		Args:
 			rank_list_size: size of the ranklist.
@@ -78,110 +78,110 @@ class DLA(object):
 			embed_size: the size of the input feature vectors.
 			forward_only: if set, we do not construct the backward pass in the model.
 		"""
-		print('Noise LSTM')
-		self.click_model = click_model
+	    print('Noise LSTM')
+	    self.click_model = click_model
 
-		self.hparams = tf.contrib.training.HParams(
-			learning_rate=0.05, 				# Learning rate.
-			#learning_rate_decay_factor=0.8, # Learning rate decays by this much.
-			max_gradient_norm=5.0,			# Clip gradients to this norm.
-			#reverse_input=True,				# Set to True for reverse input sequences.
-			hidden_layer_sizes=[512, 256, 128],		# Number of neurons in each layer of a RankNet. 
-			loss_func='click_weighted_softmax_cross_entropy',			# Select Loss function
-			logits_to_prob='softmax',		# the function used to convert logits to probability distributions
-			ranker_learning_rate=-1.0, 		# The learning rate for ranker (-1 means same with learning_rate).
-			ranker_loss_weight=1.0,			# Set the weight of unbiased ranking loss
-			l2_loss=0.0,					# Set strength for L2 regularization.
-			grad_strategy='ada',			# Select gradient strategy
-			relevance_category_num=5,		# Select the number of relevance category
-			use_previous_rel_prob=False,  # Set to True for using ranking features in denoise model.
-			use_previous_clicks=False,  # Set to True for using ranking features in denoise model.
-			split_gradients_for_denoise=True, # Set to True for splitting gradient computation in denoise model.
-		)
-		print(hparam_str)
-		self.hparams.parse(hparam_str)
+	    self.hparams = tf.contrib.training.HParams(
+	    	learning_rate=0.05, 				# Learning rate.
+	    	#learning_rate_decay_factor=0.8, # Learning rate decays by this much.
+	    	max_gradient_norm=5.0,			# Clip gradients to this norm.
+	    	#reverse_input=True,				# Set to True for reverse input sequences.
+	    	hidden_layer_sizes=[512, 256, 128],		# Number of neurons in each layer of a RankNet. 
+	    	loss_func='click_weighted_softmax_cross_entropy',			# Select Loss function
+	    	logits_to_prob='softmax',		# the function used to convert logits to probability distributions
+	    	ranker_learning_rate=-1.0, 		# The learning rate for ranker (-1 means same with learning_rate).
+	    	ranker_loss_weight=1.0,			# Set the weight of unbiased ranking loss
+	    	l2_loss=0.0,					# Set strength for L2 regularization.
+	    	grad_strategy='ada',			# Select gradient strategy
+	    	relevance_category_num=5,		# Select the number of relevance category
+	    	use_previous_rel_prob=False,  # Set to True for using ranking features in denoise model.
+	    	use_previous_clicks=False,  # Set to True for using ranking features in denoise model.
+	    	split_gradients_for_denoise=True, # Set to True for splitting gradient computation in denoise model.
+	    )
+	    print(hparam_str)
+	    self.hparams.parse(hparam_str)
 
-		self.start_index = 0
-		self.count = 1
-		self.rank_list_size = rank_list_size
-		self.embed_size = embed_size
-		self.batch_size = batch_size
-		if self.hparams.ranker_learning_rate < 0:
-			self.ranker_learning_rate = tf.Variable(float(self.hparams.learning_rate), trainable=False)
-		else:
-			self.ranker_learning_rate = tf.Variable(float(self.hparams.ranker_learning_rate), trainable=False)
-		self.learning_rate = self.ranker_learning_rate
-		#self.ranker_learning_rate_decay_op = self.ranker_learning_rate.assign(
-		#	self.ranker_learning_rate * self.hparams.learning_rate_decay_factor)
-		self.global_step = tf.Variable(0, trainable=False)
-		self.PAD_embed = tf.get_variable("PAD_embed", [1,self.embed_size],dtype=tf.float32)
-		#self.PAD_embed = tf.zeros([1,self.embed_size],dtype=tf.float32)
-		
-		# Feeds for inputs.
-		self.encoder_inputs = []
-		self.embeddings = tf.placeholder(tf.float32, shape=[None, embed_size], name="embeddings")
-		self.target_inputs = []
-		self.target_clicks = []
-		for i in xrange(self.rank_list_size):
-			self.encoder_inputs.append(tf.placeholder(tf.int64, shape=[None],
-											name="encoder{0}".format(i)))
-			self.target_inputs.append(tf.placeholder(tf.int64, shape=[None],
-											name="target{0}".format(i)))
-			self.target_clicks.append(tf.placeholder(tf.float32, shape=[None],
-											name="click{0}".format(i)))
+	    self.start_index = 0
+	    self.count = 1
+	    self.rank_list_size = rank_list_size
+	    self.embed_size = embed_size
+	    self.batch_size = batch_size
+	    if self.hparams.ranker_learning_rate < 0:
+	    	self.ranker_learning_rate = tf.Variable(float(self.hparams.learning_rate), trainable=False)
+	    else:
+	    	self.ranker_learning_rate = tf.Variable(float(self.hparams.ranker_learning_rate), trainable=False)
+	    self.learning_rate = self.ranker_learning_rate
+	    #self.ranker_learning_rate_decay_op = self.ranker_learning_rate.assign(
+	    #	self.ranker_learning_rate * self.hparams.learning_rate_decay_factor)
+	    self.global_step = tf.Variable(0, trainable=False)
+	    self.PAD_embed = tf.get_variable("PAD_embed", [1,self.embed_size],dtype=tf.float32)
+	    #self.PAD_embed = tf.zeros([1,self.embed_size],dtype=tf.float32)
 
-		# Select logits to prob function
-		self.logits_to_prob = tf.nn.softmax
-		if self.hparams.logits_to_prob == 'sigmoid':
-			self.logits_to_prob = sigmoid_prob
+	    # Feeds for inputs.
+	    self.encoder_inputs = []
+	    self.embeddings = tf.placeholder(tf.float32, shape=[None, embed_size], name="embeddings")
+	    self.target_inputs = []
+	    self.target_clicks = []
+	    for i in xrange(self.rank_list_size):
+	    	self.encoder_inputs.append(tf.placeholder(tf.int64, shape=[None],
+	    									name="encoder{0}".format(i)))
+	    	self.target_inputs.append(tf.placeholder(tf.int64, shape=[None],
+	    									name="target{0}".format(i)))
+	    	self.target_clicks.append(tf.placeholder(tf.float32, shape=[None],
+	    									name="click{0}".format(i)))
 
-		# Build model
-		self.output = self.RankNet(forward_only)
-		self.propensity = self.DenoisingNet(forward_only)
+	    # Select logits to prob function
+	    self.logits_to_prob = tf.nn.softmax
+	    if self.hparams.logits_to_prob == 'sigmoid':
+	    	self.logits_to_prob = sigmoid_prob
 
-		print('Loss Function is ' + self.hparams.loss_func)
-		# Select loss function
-		self.loss_func = None
-		if self.hparams.loss_func == 'click_weighted_softmax_cross_entropy':
-			self.loss_func = self.click_weighted_softmax_cross_entropy_loss
-		elif self.hparams.loss_func == 'click_weighted_log_loss':
-			self.loss_func = self.click_weighted_log_loss
-		else: # softmax loss without weighting
-			self.loss_func = self.softmax_loss
+	    # Build model
+	    self.output = self.RankNet(forward_only)
+	    self.propensity = self.DenoisingNet(forward_only)
 
-		# Compute rank loss
-		self.rank_loss, self.propensity_weights = self.loss_func(self.output, self.target_inputs, self.target_clicks, self.propensity)
-		pw_list = tf.split(self.propensity_weights, self.rank_list_size, 1) # Compute propensity weights
-		for i in xrange(self.rank_list_size):
-			tf.summary.scalar('Avg Propensity weights %d' % i, tf.reduce_mean(pw_list[i]))
-		tf.summary.scalar('Rank Loss', tf.reduce_mean(self.rank_loss))
+	    print(f'Loss Function is {self.hparams.loss_func}')
+	    # Select loss function
+	    self.loss_func = None
+	    if self.hparams.loss_func == 'click_weighted_log_loss':
+	        self.loss_func = self.click_weighted_log_loss
+	    elif self.hparams.loss_func == 'click_weighted_softmax_cross_entropy':
+	        self.loss_func = self.click_weighted_softmax_cross_entropy_loss
+	    else:
+	        self.loss_func = self.softmax_loss
 
-		# Compute examination loss
-		self.exam_loss, self.relevance_weights = self.loss_func(self.propensity, self.target_inputs, self.target_clicks, self.output)
-		rw_list = tf.split(self.relevance_weights, self.rank_list_size, 1) # Compute propensity weights
-		for i in xrange(self.rank_list_size):
-			tf.summary.scalar('Avg Relevance weights %d' % i, tf.reduce_mean(rw_list[i]))
-		tf.summary.scalar('Exam Loss', tf.reduce_mean(self.exam_loss))
-		
-		# Gradients and SGD update operation for training the model.
-		self.loss = self.exam_loss + self.hparams.ranker_loss_weight * self.rank_loss
-		if not forward_only:
-			# Select optimizer
-			self.optimizer_func = tf.train.AdagradOptimizer
-			if self.hparams.grad_strategy == 'sgd':
-				self.optimizer_func = tf.train.GradientDescentOptimizer
+	    # Compute rank loss
+	    self.rank_loss, self.propensity_weights = self.loss_func(self.output, self.target_inputs, self.target_clicks, self.propensity)
+	    pw_list = tf.split(self.propensity_weights, self.rank_list_size, 1) # Compute propensity weights
+	    for i in xrange(self.rank_list_size):
+	    	tf.summary.scalar('Avg Propensity weights %d' % i, tf.reduce_mean(pw_list[i]))
+	    tf.summary.scalar('Rank Loss', tf.reduce_mean(self.rank_loss))
 
-			print('Split gradients computation %r' % self.hparams.split_gradients_for_denoise)
-			if self.hparams.split_gradients_for_denoise:
-				self.separate_gradient_update()
-			else:
-				self.global_gradient_update()
-			tf.summary.scalar('Gradient Norm', self.norm)
-			tf.summary.scalar('Learning Rate', self.ranker_learning_rate)
-			tf.summary.scalar('Final Loss', tf.reduce_mean(self.loss))
+	    # Compute examination loss
+	    self.exam_loss, self.relevance_weights = self.loss_func(self.propensity, self.target_inputs, self.target_clicks, self.output)
+	    rw_list = tf.split(self.relevance_weights, self.rank_list_size, 1) # Compute propensity weights
+	    for i in xrange(self.rank_list_size):
+	    	tf.summary.scalar('Avg Relevance weights %d' % i, tf.reduce_mean(rw_list[i]))
+	    tf.summary.scalar('Exam Loss', tf.reduce_mean(self.exam_loss))
 
-		self.summary = tf.summary.merge_all()
-		self.saver = tf.train.Saver(tf.global_variables())
+	    # Gradients and SGD update operation for training the model.
+	    self.loss = self.exam_loss + self.hparams.ranker_loss_weight * self.rank_loss
+	    if not forward_only:
+	    	# Select optimizer
+	    	self.optimizer_func = tf.train.AdagradOptimizer
+	    	if self.hparams.grad_strategy == 'sgd':
+	    		self.optimizer_func = tf.train.GradientDescentOptimizer
+
+	    	print('Split gradients computation %r' % self.hparams.split_gradients_for_denoise)
+	    	if self.hparams.split_gradients_for_denoise:
+	    		self.separate_gradient_update()
+	    	else:
+	    		self.global_gradient_update()
+	    	tf.summary.scalar('Gradient Norm', self.norm)
+	    	tf.summary.scalar('Learning Rate', self.ranker_learning_rate)
+	    	tf.summary.scalar('Final Loss', tf.reduce_mean(self.loss))
+
+	    self.summary = tf.summary.merge_all()
+	    self.saver = tf.train.Saver(tf.global_variables())
 
 	def separate_gradient_update(self):
 		denoise_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "denoising_model")
@@ -367,26 +367,31 @@ class DLA(object):
 
 	#def prepare_data_with_index(self, input_seq, output_seq, output_weights, output_initial_score, features, index, encoder_inputs, decoder_targets, embeddings, decoder_clicks, decoder_propensity_weights):
 	def prepare_data_with_index(self, data_set, index, encoder_inputs, decoder_targets, embeddings, decoder_clicks):
-		i = index
-		base = len(embeddings)
-		for x in data_set.initial_list[i]:
-			if x >= 0:
-				embeddings.append(data_set.features[x])
-		decoder_targets.append([x if data_set.gold_list[i][x] < 0 else data_set.gold_list[i][x] for x in xrange(len(data_set.gold_list[i]))])
-		#if self.hparams.reverse_input:
-		encoder_inputs.append(list([-1 if data_set.initial_list[i][x] < 0 else base+x for x in xrange(len(data_set.initial_list[i]))]))
-			
-		# Generate clicks with click models.
-		gold_label_list = [0 if data_set.initial_list[i][x] < 0 else data_set.gold_weights[i][x] for x in xrange(len(data_set.initial_list[i]))]
-		click_list, _, _ = self.click_model.sampleClicksForOneList(list(gold_label_list))
-		while sum(click_list) == 0:
-			click_list, _, _ = self.click_model.sampleClicksForOneList(list(gold_label_list))
-		#click_list = list(gold_label_list) # debug
-		decoder_clicks.append(click_list)
+	    i = index
+	    base = len(embeddings)
+	    for x in data_set.initial_list[i]:
+	    	if x >= 0:
+	    		embeddings.append(data_set.features[x])
+	    decoder_targets.append([x if data_set.gold_list[i][x] < 0 else data_set.gold_list[i][x] for x in xrange(len(data_set.gold_list[i]))])
+	    	#if self.hparams.reverse_input:
+	    encoder_inputs.append(
+	        [
+	            -1 if data_set.initial_list[i][x] < 0 else base + x
+	            for x in xrange(len(data_set.initial_list[i]))
+	        ]
+	    )
+
+	    # Generate clicks with click models.
+	    gold_label_list = [0 if data_set.initial_list[i][x] < 0 else data_set.gold_weights[i][x] for x in xrange(len(data_set.initial_list[i]))]
+	    click_list, _, _ = self.click_model.sampleClicksForOneList(list(gold_label_list))
+	    while sum(click_list) == 0:
+	    	click_list, _, _ = self.click_model.sampleClicksForOneList(list(gold_label_list))
+	    #click_list = list(gold_label_list) # debug
+	    decoder_clicks.append(click_list)
 			
 	#def get_batch(self, input_seq, output_seq, output_weights, output_initial_score, features):
 	def get_batch(self, data_set):
-		"""Get a random batch of data from the specified bucket, prepare for step.
+	    """Get a random batch of data from the specified bucket, prepare for step.
 
 		To feed data in step(..) it must be a list of batch-major vectors, while
 		data here contains single length-major cases. So the main logic of this
@@ -403,62 +408,61 @@ class DLA(object):
 			the constructed batch that has the proper format to call step(...) later.
 		"""
 
-		if len(data_set.initial_list[0]) != self.rank_list_size:
-			raise ValueError("Input ranklist length must be equal to the one in bucket,"
-							 " %d != %d." % (len(data_set.initial_list[0]), self.rank_list_size))
-		length = len(data_set.initial_list)
-		encoder_inputs, decoder_targets, embeddings, decoder_clicks = [], [], [], []
-		
-		rank_list_idxs = []
-		for _ in xrange(self.batch_size):
-			i = int(random.random() * length)
-			rank_list_idxs.append(i)
-			self.prepare_data_with_index(data_set, i,
-								encoder_inputs, decoder_targets, embeddings, decoder_clicks)
+	    if len(data_set.initial_list[0]) != self.rank_list_size:
+	    	raise ValueError("Input ranklist length must be equal to the one in bucket,"
+	    					 " %d != %d." % (len(data_set.initial_list[0]), self.rank_list_size))
+	    length = len(data_set.initial_list)
+	    encoder_inputs, decoder_targets, embeddings, decoder_clicks = [], [], [], []
 
-		#self.start_index += self.batch_size
+	    rank_list_idxs = []
+	    for _ in xrange(self.batch_size):
+	    	i = int(random.random() * length)
+	    	rank_list_idxs.append(i)
+	    	self.prepare_data_with_index(data_set, i,
+	    						encoder_inputs, decoder_targets, embeddings, decoder_clicks)
 
-		embedings_length = len(embeddings)
-		for i in xrange(self.batch_size):
-			for j in xrange(self.rank_list_size):
-				if encoder_inputs[i][j] < 0:
-					encoder_inputs[i][j] = embedings_length
+	    #self.start_index += self.batch_size
+
+	    embedings_length = len(embeddings)
+	    for i in xrange(self.batch_size):
+	    	for j in xrange(self.rank_list_size):
+	    		if encoder_inputs[i][j] < 0:
+	    			encoder_inputs[i][j] = embedings_length
 
 
-		batch_encoder_inputs = []
-		batch_clicks = []
-		batch_targets = []
-		for length_idx in xrange(self.rank_list_size):
-			# Batch encoder inputs are just re-indexed encoder_inputs.
-			batch_encoder_inputs.append(
-				np.array([encoder_inputs[batch_idx][length_idx]
-					for batch_idx in xrange(self.batch_size)], dtype=np.float32))
-			# Batch decoder inputs are re-indexed decoder_inputs, we create weights.
-			batch_targets.append(
-				np.array([decoder_targets[batch_idx][length_idx]
-						for batch_idx in xrange(self.batch_size)], dtype=np.int32))
-			batch_clicks.append(
-				np.array([decoder_clicks[batch_idx][length_idx]
-						for batch_idx in xrange(self.batch_size)], dtype=np.float32))
-		# Create input feed map
-		input_feed = {}
-		input_feed[self.embeddings.name] = np.array(embeddings)
-		for l in xrange(self.rank_list_size):
-			input_feed[self.encoder_inputs[l].name] = batch_encoder_inputs[l]
-			input_feed[self.target_inputs[l].name] = batch_targets[l]
-			input_feed[self.target_clicks[l].name] = batch_clicks[l]
-		# Create others_map to store other information
-		others_map = {
-			'rank_list_idxs' : rank_list_idxs,
-			'input_list' : encoder_inputs,
-			'click_list' : decoder_clicks,
-			'embeddings' : embeddings
-		}
+	    batch_encoder_inputs = []
+	    batch_clicks = []
+	    batch_targets = []
+	    for length_idx in xrange(self.rank_list_size):
+	    	# Batch encoder inputs are just re-indexed encoder_inputs.
+	    	batch_encoder_inputs.append(
+	    		np.array([encoder_inputs[batch_idx][length_idx]
+	    			for batch_idx in xrange(self.batch_size)], dtype=np.float32))
+	    	# Batch decoder inputs are re-indexed decoder_inputs, we create weights.
+	    	batch_targets.append(
+	    		np.array([decoder_targets[batch_idx][length_idx]
+	    				for batch_idx in xrange(self.batch_size)], dtype=np.int32))
+	    	batch_clicks.append(
+	    		np.array([decoder_clicks[batch_idx][length_idx]
+	    				for batch_idx in xrange(self.batch_size)], dtype=np.float32))
+	    	# Create input feed map
+	    input_feed = {self.embeddings.name: np.array(embeddings)}
+	    for l in xrange(self.rank_list_size):
+	    	input_feed[self.encoder_inputs[l].name] = batch_encoder_inputs[l]
+	    	input_feed[self.target_inputs[l].name] = batch_targets[l]
+	    	input_feed[self.target_clicks[l].name] = batch_clicks[l]
+	    # Create others_map to store other information
+	    others_map = {
+	    	'rank_list_idxs' : rank_list_idxs,
+	    	'input_list' : encoder_inputs,
+	    	'click_list' : decoder_clicks,
+	    	'embeddings' : embeddings
+	    }
 
-		return input_feed, others_map
+	    return input_feed, others_map
 
 	def get_next_batch(self, index, data_set):
-		"""Get a random batch of data from the specified bucket, prepare for step.
+	    """Get a random batch of data from the specified bucket, prepare for step.
 
 		To feed data in step(..) it must be a list of batch-major vectors, while
 		data here contains single length-major cases. So the main logic of this
@@ -474,56 +478,55 @@ class DLA(object):
 			The triple (encoder_inputs, decoder_inputs, target_weights) for
 			the constructed batch that has the proper format to call step(...) later.
 		"""
-		if len(data_set.initial_list[0]) != self.rank_list_size:
-			raise ValueError("Input ranklist length must be equal to the one in bucket,"
-							 " %d != %d." % (len(data_set.initial_list[0]), self.rank_list_size))
-		length = len(data_set.initial_list)
-		encoder_inputs, decoder_targets, embeddings, decoder_clicks = [], [], [], []
-		
-		for offset in xrange(self.batch_size):
-			i = index + offset
-			self.prepare_data_with_index(data_set, i, encoder_inputs, decoder_targets, 
-				embeddings, decoder_clicks)
+	    if len(data_set.initial_list[0]) != self.rank_list_size:
+	    	raise ValueError("Input ranklist length must be equal to the one in bucket,"
+	    					 " %d != %d." % (len(data_set.initial_list[0]), self.rank_list_size))
+	    length = len(data_set.initial_list)
+	    encoder_inputs, decoder_targets, embeddings, decoder_clicks = [], [], [], []
 
-		embedings_length = len(embeddings)
-		for i in xrange(self.batch_size):
-			for j in xrange(self.rank_list_size):
-				if encoder_inputs[i][j] < 0:
-					encoder_inputs[i][j] = embedings_length
+	    for offset in xrange(self.batch_size):
+	    	i = index + offset
+	    	self.prepare_data_with_index(data_set, i, encoder_inputs, decoder_targets, 
+	    		embeddings, decoder_clicks)
+
+	    embedings_length = len(embeddings)
+	    for i in xrange(self.batch_size):
+	    	for j in xrange(self.rank_list_size):
+	    		if encoder_inputs[i][j] < 0:
+	    			encoder_inputs[i][j] = embedings_length
 
 
-		batch_encoder_inputs = []
-		batch_clicks = []
-		batch_targets = []
-		for length_idx in xrange(self.rank_list_size):
-			# Batch encoder inputs are just re-indexed encoder_inputs.
-			batch_encoder_inputs.append(
-				np.array([encoder_inputs[batch_idx][length_idx]
-					for batch_idx in xrange(self.batch_size)], dtype=np.float32))
-			# Batch decoder inputs are re-indexed decoder_inputs, we create weights.
-			batch_targets.append(
-				np.array([decoder_targets[batch_idx][length_idx]
-						for batch_idx in xrange(self.batch_size)], dtype=np.int32))
-			batch_clicks.append(
-				np.array([decoder_clicks[batch_idx][length_idx]
-						for batch_idx in xrange(self.batch_size)], dtype=np.float32))
-		# Create input feed map
-		input_feed = {}
-		input_feed[self.embeddings.name] = np.array(embeddings)
-		for l in xrange(self.rank_list_size):
-			input_feed[self.encoder_inputs[l].name] = batch_encoder_inputs[l]
-			input_feed[self.target_inputs[l].name] = batch_targets[l]
-			input_feed[self.target_clicks[l].name] = batch_clicks[l]
-		# Create others_map to store other information
-		others_map = {
-			'input_list' : encoder_inputs,
-			'click_list' : decoder_clicks,
-		}
+	    batch_encoder_inputs = []
+	    batch_clicks = []
+	    batch_targets = []
+	    for length_idx in xrange(self.rank_list_size):
+	    	# Batch encoder inputs are just re-indexed encoder_inputs.
+	    	batch_encoder_inputs.append(
+	    		np.array([encoder_inputs[batch_idx][length_idx]
+	    			for batch_idx in xrange(self.batch_size)], dtype=np.float32))
+	    	# Batch decoder inputs are re-indexed decoder_inputs, we create weights.
+	    	batch_targets.append(
+	    		np.array([decoder_targets[batch_idx][length_idx]
+	    				for batch_idx in xrange(self.batch_size)], dtype=np.int32))
+	    	batch_clicks.append(
+	    		np.array([decoder_clicks[batch_idx][length_idx]
+	    				for batch_idx in xrange(self.batch_size)], dtype=np.float32))
+	    	# Create input feed map
+	    input_feed = {self.embeddings.name: np.array(embeddings)}
+	    for l in xrange(self.rank_list_size):
+	    	input_feed[self.encoder_inputs[l].name] = batch_encoder_inputs[l]
+	    	input_feed[self.target_inputs[l].name] = batch_targets[l]
+	    	input_feed[self.target_clicks[l].name] = batch_clicks[l]
+	    # Create others_map to store other information
+	    others_map = {
+	    	'input_list' : encoder_inputs,
+	    	'click_list' : decoder_clicks,
+	    }
 
-		return input_feed, others_map
+	    return input_feed, others_map
 
-	def get_data_by_index(self, data_set, index): #not fixed
-		"""Get one data from the specified index, prepare for step.
+	def get_data_by_index(self, data_set, index):    #not fixed
+	    """Get one data from the specified index, prepare for step.
 
 				Args:
 					input_seq: a list of initial ranking ([0,1,2,3,4...])
@@ -536,52 +539,51 @@ class DLA(object):
 					The triple (encoder_inputs, decoder_inputs, target_weights) for
 					the constructed batch that has the proper format to call step(...) later.
 				"""
-		if len(data_set.initial_list[0]) != self.rank_list_size:
-			raise ValueError("Input ranklist length must be equal to the one in bucket,"
-							 " %d != %d." % (len(data_set.initial_list[0]), self.rank_list_size))
-		length = len(data_set.initial_list)
-		encoder_inputs, decoder_targets, embeddings, decoder_clicks = [], [], [], []
-		
-		i = index
-		self.prepare_data_with_index(data_set, i, encoder_inputs, decoder_targets, 
-				embeddings, decoder_clicks)
+	    if len(data_set.initial_list[0]) != self.rank_list_size:
+	    	raise ValueError("Input ranklist length must be equal to the one in bucket,"
+	    					 " %d != %d." % (len(data_set.initial_list[0]), self.rank_list_size))
+	    length = len(data_set.initial_list)
+	    encoder_inputs, decoder_targets, embeddings, decoder_clicks = [], [], [], []
 
-		embedings_length = len(embeddings)
-		for i in xrange(self.batch_size):
-			for j in xrange(self.rank_list_size):
-				if encoder_inputs[i][j] < 0:
-					encoder_inputs[i][j] = embedings_length
+	    i = index
+	    self.prepare_data_with_index(data_set, i, encoder_inputs, decoder_targets, 
+	    		embeddings, decoder_clicks)
+
+	    embedings_length = len(embeddings)
+	    for i in xrange(self.batch_size):
+	    	for j in xrange(self.rank_list_size):
+	    		if encoder_inputs[i][j] < 0:
+	    			encoder_inputs[i][j] = embedings_length
 
 
-		batch_encoder_inputs = []
-		batch_clicks = []
-		batch_targets = []
-		for length_idx in xrange(self.rank_list_size):
-			# Batch encoder inputs are just re-indexed encoder_inputs.
-			batch_encoder_inputs.append(
-				np.array([encoder_inputs[batch_idx][length_idx]
-					for batch_idx in xrange(self.batch_size)], dtype=np.float32))
-			# Batch decoder inputs are re-indexed decoder_inputs, we create weights.
-			batch_targets.append(
-				np.array([decoder_targets[batch_idx][length_idx]
-						for batch_idx in xrange(self.batch_size)], dtype=np.int32))
-			batch_clicks.append(
-				np.array([decoder_clicks[batch_idx][length_idx]
-						for batch_idx in xrange(self.batch_size)], dtype=np.float32))
-		# Create input feed map
-		input_feed = {}
-		input_feed[self.embeddings.name] = np.array(embeddings)
-		for l in xrange(self.rank_list_size):
-			input_feed[self.encoder_inputs[l].name] = batch_encoder_inputs[l]
-			input_feed[self.target_inputs[l].name] = batch_targets[l]
-			input_feed[self.target_clicks[l].name] = batch_clicks[l]
-		# Create others_map to store other information
-		others_map = {
-			'input_list' : encoder_inputs,
-			'click_list' : decoder_clicks,
-		}
+	    batch_encoder_inputs = []
+	    batch_clicks = []
+	    batch_targets = []
+	    for length_idx in xrange(self.rank_list_size):
+	    	# Batch encoder inputs are just re-indexed encoder_inputs.
+	    	batch_encoder_inputs.append(
+	    		np.array([encoder_inputs[batch_idx][length_idx]
+	    			for batch_idx in xrange(self.batch_size)], dtype=np.float32))
+	    	# Batch decoder inputs are re-indexed decoder_inputs, we create weights.
+	    	batch_targets.append(
+	    		np.array([decoder_targets[batch_idx][length_idx]
+	    				for batch_idx in xrange(self.batch_size)], dtype=np.int32))
+	    	batch_clicks.append(
+	    		np.array([decoder_clicks[batch_idx][length_idx]
+	    				for batch_idx in xrange(self.batch_size)], dtype=np.float32))
+	    	# Create input feed map
+	    input_feed = {self.embeddings.name: np.array(embeddings)}
+	    for l in xrange(self.rank_list_size):
+	    	input_feed[self.encoder_inputs[l].name] = batch_encoder_inputs[l]
+	    	input_feed[self.target_inputs[l].name] = batch_targets[l]
+	    	input_feed[self.target_clicks[l].name] = batch_clicks[l]
+	    # Create others_map to store other information
+	    others_map = {
+	    	'input_list' : encoder_inputs,
+	    	'click_list' : decoder_clicks,
+	    }
 
-		return input_feed, others_map
+	    return input_feed, others_map
 
 	def softmax_loss(self, output, target_inputs, target_clicks, propensity, name=None):
 		loss = None

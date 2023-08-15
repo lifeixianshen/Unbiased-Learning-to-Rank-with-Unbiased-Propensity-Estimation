@@ -20,7 +20,7 @@ import os
 
 class Raw_data:
 	def __init__(self, data_path = None, file_prefix = None, rank_cut=100000):
-		if data_path == None:
+		if data_path is None:
 			self.embed_size = -1
 			self.rank_list_size = -1
 			self.features = []
@@ -31,42 +31,39 @@ class Raw_data:
 			self.gold_weights = []
 			return
 
-		settings = json.load(open(data_path + 'settings.json'))
+		settings = json.load(open(f'{data_path}settings.json'))
 		self.embed_size = settings['embed_size']
-		self.rank_list_size = rank_cut if rank_cut<settings['rank_cutoff'] else settings['rank_cutoff']
+		self.rank_list_size = min(rank_cut, settings['rank_cutoff'])
 
 		self.features = []
 		self.dids = []
-		feature_fin = open(data_path + file_prefix + '/' + file_prefix + '.feature')
-		for line in feature_fin:
-			arr = line.strip().split(' ')
-			self.dids.append(arr[0])
-			self.features.append([0.0 for _ in xrange(self.embed_size)])
-			for x in arr[1:]:
-				arr2 = x.split(':')
-				self.features[-1][int(arr2[0])] = float(arr2[1])
-		feature_fin.close()
-
+		with open(data_path + file_prefix + '/' + file_prefix + '.feature') as feature_fin:
+			for line in feature_fin:
+				arr = line.strip().split(' ')
+				self.dids.append(arr[0])
+				self.features.append([0.0 for _ in xrange(self.embed_size)])
+				for x in arr[1:]:
+					arr2 = x.split(':')
+					self.features[-1][int(arr2[0])] = float(arr2[1])
 		self.initial_list = []
 		self.qids = []
-		init_list_fin = open(data_path + file_prefix + '/' + file_prefix + '.init_list')
-		for line in init_list_fin:
-			arr = line.strip().split(' ')
-			self.qids.append(arr[0])
-			self.initial_list.append([int(x) for x in arr[1:][:self.rank_list_size]])
-		init_list_fin.close()
-
+		with open(data_path + file_prefix + '/' + file_prefix + '.init_list') as init_list_fin:
+			for line in init_list_fin:
+				arr = line.strip().split(' ')
+				self.qids.append(arr[0])
+				self.initial_list.append([int(x) for x in arr[1:][:self.rank_list_size]])
 		self.gold_list = []
-		gold_list_fin = open(data_path + file_prefix + '/' + file_prefix + '.gold_list')
-		for line in gold_list_fin:
-			self.gold_list.append([int(x) for x in line.strip().split(' ')[1:][:self.rank_list_size]])
-		gold_list_fin.close()
-
+		with open(data_path + file_prefix + '/' + file_prefix + '.gold_list') as gold_list_fin:
+			self.gold_list.extend(
+				[int(x) for x in line.strip().split(' ')[1:][: self.rank_list_size]]
+				for line in gold_list_fin
+			)
 		self.gold_weights = []
-		gold_weight_fin = open(data_path + file_prefix + '/' + file_prefix + '.weights')
-		for line in gold_weight_fin:
-			self.gold_weights.append([float(x) for x in line.strip().split(' ')[1:][:self.rank_list_size]])
-		gold_weight_fin.close()
+		with open(data_path + file_prefix + '/' + file_prefix + '.weights') as gold_weight_fin:
+			self.gold_weights.extend(
+				[float(x) for x in line.strip().split(' ')[1:][: self.rank_list_size]]
+				for line in gold_weight_fin
+			)
 
 		#self.initial_scores = []
 		#if os.path.isfile(data_path + file_prefix + '/' + file_prefix + '.intial_scores'):
@@ -89,8 +86,7 @@ class Raw_data:
 
 
 def read_data(data_path, file_prefix, rank_cut = 100000):
-	data = Raw_data(data_path, file_prefix, rank_cut)
-	return data
+	return Raw_data(data_path, file_prefix, rank_cut)
 
 def generate_ranklist(data, rerank_lists):
 	if len(rerank_lists) != len(data.initial_list):
@@ -110,16 +106,13 @@ def generate_ranklist(data, rerank_lists):
 			if idx not in index_set:
 				index_set.add(idx)
 				index_list.append(idx)
-		for idx in xrange(len(rerank_lists[i])):
-			if idx not in index_set:
-				index_list.append(idx)
+		index_list.extend(
+			idx for idx in xrange(len(rerank_lists[i])) if idx not in index_set
+		)
 		#get new ranking list
 		qid = data.qids[i]
-		did_list = []
 		new_list = [data.initial_list[i][idx] for idx in index_list]
-		for ni in new_list:
-			if ni >= 0:
-				did_list.append(data.dids[ni])
+		did_list = [data.dids[ni] for ni in new_list if ni >= 0]
 		qid_list_map[qid] = did_list
 	return qid_list_map
 
@@ -143,26 +136,29 @@ def generate_ranklist_by_scores(data, rerank_scores):
 			if idx not in index_set:
 				index_set.add(idx)
 				index_list.append(idx)
-		for idx in xrange(len(rerank_list)):
-			if idx not in index_set:
-				index_list.append(idx)
+		index_list.extend(
+			idx for idx in xrange(len(rerank_list)) if idx not in index_set
+		)
 		#get new ranking list
 		qid = data.qids[i]
 		did_list = []
 		for idx in index_list:
 			ni = data.initial_list[i][idx]
-			ns = scores[idx]
 			if ni >= 0:
+				ns = scores[idx]
 				did_list.append((data.dids[ni], ns))
 		qid_list_map[qid] = did_list
 	return qid_list_map
 
 def output_ranklist(data, rerank_scores, output_path, file_name = 'test'):
 	qid_list_map = generate_ranklist_by_scores(data, rerank_scores)
-	fout = open(output_path + file_name + '.ranklist','w')
-	for qid in data.qids:
-		for i in xrange(len(qid_list_map[qid])):
-			fout.write(qid + ' Q0 ' + qid_list_map[qid][i][0] + ' ' + str(i+1)
-							+ ' ' + str(qid_list_map[qid][i][1]) + ' RankLSTM\n')
-	fout.close()
+	with open(output_path + file_name + '.ranklist','w') as fout:
+		for qid in data.qids:
+			for i in xrange(len(qid_list_map[qid])):
+				fout.write(
+					(
+						f'{qid} Q0 {qid_list_map[qid][i][0]} {str(i + 1)} {str(qid_list_map[qid][i][1])}'
+						+ ' RankLSTM\n'
+					)
+				)
 

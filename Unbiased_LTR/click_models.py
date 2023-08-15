@@ -22,13 +22,12 @@ class ClickModel:
 
 	# Serialize model into a json.
 	def getModelJson(self):
-		desc = {
-			'model_name' : self.model_name,
-			'eta' : self.eta,
-			'click_prob' : self.click_prob,
-			'exam_prob' : self.exam_prob
+		return {
+			'model_name': self.model_name,
+			'eta': self.eta,
+			'click_prob': self.click_prob,
+			'exam_prob': self.exam_prob,
 		}
-		return desc
 
 	# Generate noisy click probability based on relevance grading number
 	# Inspired by ERR
@@ -80,7 +79,7 @@ class PositionBiasedModel(ClickModel):
 		return propensity_weights
 
 	def sampleClick(self, rank, relevance_label):
-		if not relevance_label == int(relevance_label):
+		if relevance_label != int(relevance_label):
 			print('RELEVANCE LABEL MUST BE INTEGER!')
 		relevance_label = int(relevance_label) if relevance_label > 0 else 0
 		exam_p = self.getExamProb(rank)
@@ -112,8 +111,10 @@ class UserBrowsingModel(ClickModel):
 			[1.0, 1.0, 1.0, 0.96, 0.52, 0.36, 0.27, 0.18, 0.12, 0.43]
 		]
 		self.exam_prob = []
-		for i in xrange(len(self.original_rd_exam_table)):
-			self.exam_prob.append([pow(x, eta) for x in self.original_rd_exam_table[i]])
+		self.exam_prob.extend(
+			[pow(x, eta) for x in self.original_rd_exam_table[i]]
+			for i in xrange(len(self.original_rd_exam_table))
+		)
 
 	def sampleClicksForOneList(self, label_list):
 		click_list, exam_p_list, click_p_list = [], [], []
@@ -140,7 +141,7 @@ class UserBrowsingModel(ClickModel):
 		return propensity_weights
 
 	def sampleClick(self, rank, last_click_rank, relevance_label):
-		if not relevance_label == int(relevance_label):
+		if relevance_label != int(relevance_label):
 			print('RELEVANCE LABEL MUST BE INTEGER!')
 		relevance_label = int(relevance_label) if relevance_label > 0 else 0
 		exam_p = self.getExamProb(rank, last_click_rank)
@@ -151,14 +152,12 @@ class UserBrowsingModel(ClickModel):
 	def getExamProb(self, rank, last_click_rank):
 		distance = rank - last_click_rank
 		if rank < len(self.exam_prob):
-			exam_p = self.exam_prob[rank][distance-1]
+			return self.exam_prob[rank][distance-1]
+		elif distance > rank:
+			return self.exam_prob[-1][-1]
 		else:
-			if distance > rank:
-				exam_p = self.exam_prob[-1][-1]
-			else:
-				idx = distance-1 if distance < len(self.exam_prob[-1])-1 else -2
-				exam_p = self.exam_prob[-1][idx]
-		return exam_p
+			idx = distance-1 if distance < len(self.exam_prob[-1])-1 else -2
+			return self.exam_prob[-1][idx]
 
 
 def test_initialization():

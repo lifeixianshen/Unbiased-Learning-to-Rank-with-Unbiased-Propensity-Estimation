@@ -10,17 +10,19 @@ if not os.path.exists(OUTPUT_PATH):
 	os.makedirs(OUTPUT_PATH)
 
 #train model
-train_command = SVM_RANK_PATH + 'svm_rank_learn -c 200 ' + TRAIN_FILE + ' ' + OUTPUT_PATH + 'model.dat'
+train_command = (
+	f'{SVM_RANK_PATH}svm_rank_learn -c 200 {TRAIN_FILE} {OUTPUT_PATH}model.dat'
+)
 print(train_command)
 os.system(train_command)
 
 #test model
-command = SVM_RANK_PATH + 'svm_rank_classify ' + TRAIN_FILE + ' ' + OUTPUT_PATH + 'model.dat ' + OUTPUT_PATH + 'train.predict'
+command = f'{SVM_RANK_PATH}svm_rank_classify {TRAIN_FILE} {OUTPUT_PATH}model.dat {OUTPUT_PATH}train.predict'
 print(command)
 os.system(command)
-command = SVM_RANK_PATH + 'svm_rank_classify ' + VALID_FILE + ' ' + OUTPUT_PATH + 'model.dat ' + OUTPUT_PATH + 'valid.predict'
+command = f'{SVM_RANK_PATH}svm_rank_classify {VALID_FILE} {OUTPUT_PATH}model.dat {OUTPUT_PATH}valid.predict'
 print(command)
 os.system(command)
-command = SVM_RANK_PATH + 'svm_rank_classify ' + TEST_FILE + ' ' + OUTPUT_PATH + 'model.dat ' + OUTPUT_PATH + 'test.predict'
+command = f'{SVM_RANK_PATH}svm_rank_classify {TEST_FILE} {OUTPUT_PATH}model.dat {OUTPUT_PATH}test.predict'
 print(command)
 os.system(command)

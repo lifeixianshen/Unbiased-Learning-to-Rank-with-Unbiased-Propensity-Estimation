@@ -76,8 +76,8 @@ def main():
 	click_model_json_file = sys.argv[1]
 	data_dir = sys.argv[2]
 	output_file = sys.argv[3]
-	
-	print("Load data from " + data_dir)
+
+	print(f"Load data from {data_dir}")
 	train_set = data_utils.read_data(data_dir, 'train')
 	click_model = None
 	with open(click_model_json_file) as fin:

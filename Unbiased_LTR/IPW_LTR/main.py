@@ -72,13 +72,12 @@ def create_model(session, data_set, forward_only):
 			p_estimator = pe.RandomizedPropensityEstimator(FLAGS.estimator_json)
 		else: # Oracle estimator
 			p_estimator = pe.OraclePropensityEstimator(cm.loadModelFromJson(data))
-	
+
 	model = IPWrank(click_model, p_estimator, FLAGS.use_non_clicked_data, data_set.rank_list_size, 
 		data_set.embed_size, FLAGS.batch_size, FLAGS.hparams, forward_only, FLAGS.feed_previous)
 
-	ckpt = tf.train.get_checkpoint_state(FLAGS.train_dir)
-	if ckpt:
-		print("Reading model parameters from %s" % ckpt.model_checkpoint_path)
+	if ckpt := tf.train.get_checkpoint_state(FLAGS.train_dir):
+		print(f"Reading model parameters from {ckpt.model_checkpoint_path}")
 		model.saver.restore(session, ckpt.model_checkpoint_path)
 	else:
 		print("Created model with fresh parameters.")
@@ -88,8 +87,8 @@ def create_model(session, data_set, forward_only):
 
 def train():
 	# Prepare data.
-	print("Reading data in %s" % FLAGS.data_dir)
-	
+	print(f"Reading data in {FLAGS.data_dir}")
+
 	train_set = data_utils.read_data(FLAGS.data_dir, 'train', FLAGS.train_list_cutoff)
 	valid_set = data_utils.read_data(FLAGS.data_dir, 'valid', FLAGS.train_list_cutoff)
 	print("Rank list size %d" % train_set.rank_list_size)
@@ -103,9 +102,10 @@ def train():
 		print("Created %d layers of %d units." % (model.hparams.num_layers, model.embed_size))
 
 		# Create tensorboard summarizations.
-		train_writer = tf.summary.FileWriter(FLAGS.train_dir + '/train_log',
-										sess.graph)
-		valid_writer = tf.summary.FileWriter(FLAGS.train_dir + '/valid_log')
+		train_writer = tf.summary.FileWriter(
+			f'{FLAGS.train_dir}/train_log', sess.graph
+		)
+		valid_writer = tf.summary.FileWriter(f'{FLAGS.train_dir}/valid_log')
 
 		#pad data
 		train_set.pad(train_set.rank_list_size)
@@ -129,13 +129,13 @@ def train():
 
 			# Once in a while, we save checkpoint, print statistics, and run evals.
 			if current_step % FLAGS.steps_per_checkpoint == 0:
-				
+
 				# Print statistics for the previous epoch.
 				#loss = math.exp(loss) if loss < 300 else float('inf')
 				print ("global step %d learning rate %.4f step-time %.2f loss "
 							 "%.2f" % (model.global_step.eval(), model.learning_rate.eval(),
 												 step_time, loss))
-				
+
 				#train_writer.add_summary({'step-time':step_time, 'loss':loss}, current_step)
 
 				# Decrease learning rate if no improvement was seen over last 3 times.
@@ -162,7 +162,7 @@ def train():
 				#best_loss = eval_ppx
 				checkpoint_path = os.path.join(FLAGS.train_dir, "IPWrank.ckpt")
 				model.saver.save(sess, checkpoint_path, global_step=model.global_step)
-				
+
 				if loss == float('inf'):
 					break
 
@@ -179,7 +179,7 @@ def decode():
 	config.gpu_options.allow_growth = True
 	with tf.Session(config=config) as sess:
 		# Load test data.
-		print("Reading data in %s" % FLAGS.data_dir)
+		print(f"Reading data in {FLAGS.data_dir}")
 		test_set = None
 		if FLAGS.decode_train:
 			test_set = data_utils.read_data(FLAGS.data_dir,'train')
